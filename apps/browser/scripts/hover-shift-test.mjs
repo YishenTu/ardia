@@ -71,6 +71,36 @@ try {
       return `${hovered} hovered views, nothing moved`;
     });
   }
+
+  const below = await ac(`
+    const s = ac.store.getState();
+    s.updateSettings({ tabLayout: "sidebar" });
+    s.setDownloadsOpen("w1", false);
+    const { store } = ac.live;
+    const folder = store.live().folderOrder[0];
+    store.updateFolder(folder, { after: null, collapsed: true });
+    const group = s.groupTabs(["t10", "t11"], { pinned: true, name: "Below the folder" });
+    ac.store.getState().updateGroup(group, { collapsed: true });
+    return { folder, group };
+  `);
+  for (const addressBar of ["toolbar", "sidebar"]) {
+    await rep.check(`a collapsed live folder's rows don't take the hover of the group below (address bar in the ${addressBar})`, async () => {
+      const [group, header] = await ac(`
+        ac.store.getState().updateSettings({ addressBar: "${addressBar}" });
+        return new Promise((r) => setTimeout(r, 800))
+          .then(() => Promise.all([ac.sidebarRows.measureRow("w1", "${below.group}"), ac.sidebarRows.measureRow("w1", "livefolder|${below.folder}")]));
+      `);
+      if (!group || !header) throw new Error("the folder or the group isn't in the sidebar");
+      if (group.y <= header.y) throw new Error(`the group isn't below the folder (group y ${group.y}, folder y ${header.y})`);
+      const card = await ac(`
+        return ac.shell.devSetPointer("w1", { x: ${group.x + 40}, y: ${group.y + group.height / 2} })
+          .then(() => new Promise((r) => setTimeout(r, 1200)))
+          .then(() => { const h = ac.sidebarRows.useSidebarUi.getState().hover; return ac.shell.devSetPointer("w1", null).then(() => h && h.kind + ":" + h.id); });
+      `);
+      if (card !== `group:${below.group}`) throw new Error(`hovering the group showed ${card ?? "no card"}, not the group's`);
+      return "the group's card";
+    });
+  }
 } catch (error) {
   rep.record("setup", { error });
 } finally {
