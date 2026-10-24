@@ -16,6 +16,14 @@ test("a match that scores exactly zero is still a match", () => {
   assert.deepEqual(rankByQuery("py", [row("Unrelated", "about:blank"), zero]), [zero]);
 });
 
+test("a query with no word tokens matches only text that contains it", () => {
+  const tokyo = row("東京 travel guide", "about:blank");
+  const plain = row("Python docs", "https://docs.python.org/3/");
+  assert.deepEqual(rankByQuery("-", [plain, tokyo]), []);
+  assert.deepEqual(rankByQuery("!!!", [plain, tokyo]), []);
+  assert.deepEqual(rankByQuery("東京", [plain, tokyo]), [tokyo]);
+});
+
 test("a host match counts when the title doesn't", () => {
   const github = row("Change is constant", "https://www.github.com/");
   assert.deepEqual(rankByQuery("github", [row("Other", "about:blank"), github]), [github]);

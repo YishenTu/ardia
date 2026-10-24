@@ -19,10 +19,16 @@ function isSubsequence(needle: string, haystack: string): boolean {
 }
 
 export function fuzzyScore(query: string, text: string): number {
-  return fuzzyMatchScore(query, text) ?? 0;
+  return tokenScore(query, text) ?? 0;
 }
 
 export function fuzzyMatchScore(query: string, text: string): number | null {
+  const q = query.trim().toLowerCase();
+  if (q && !words(q).length && !text.toLowerCase().includes(q)) return null;
+  return tokenScore(query, text);
+}
+
+function tokenScore(query: string, text: string): number | null {
   const q = query.trim().toLowerCase();
   const t = text.toLowerCase();
   if (!q) return null;
