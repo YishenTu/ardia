@@ -1,4 +1,4 @@
-import { FadeLabel, restoreKeyResponder, saveKeyResponder, Surface, Symbol } from "@ardia/shell";
+import { discardKeyResponder, FadeLabel, restoreKeyResponder, saveKeyResponder, Surface, Symbol } from "@ardia/shell";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { useShallow } from "zustand/react/shallow";
@@ -88,7 +88,11 @@ export function GroupPanel({ groupId, windowId, anchor, windowHeight }: { groupI
     if (to === "origin" && next?.kind === "group" && next.windowId === windowId && next.id !== groupId) return;
     const from = focusOrigin;
     focusOrigin = null;
-    if (to === "page" || !from) return returnFocusToPage(windowId);
+    if (!from) return returnFocusToPage(windowId);
+    if (to === "page") {
+      void from.then(discardKeyResponder);
+      return returnFocusToPage(windowId);
+    }
     void from.then(restoreKeyResponder).then((restored) => {
       if (!restored) returnFocusToPage(windowId);
     });
@@ -176,7 +180,10 @@ export function GroupPanel({ groupId, windowId, anchor, windowHeight }: { groupI
           enableFocusRing={false}
           onFocus={holdWhileUsed}
           onBlur={() => {
-            if (focused.current) focusOrigin = null;
+            if (focused.current && focusOrigin) {
+              void focusOrigin.then(discardKeyResponder);
+              focusOrigin = null;
+            }
             focused.current = false;
             holdHover(false);
           }}

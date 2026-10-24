@@ -19,9 +19,13 @@ function isSubsequence(needle: string, haystack: string): boolean {
 }
 
 export function fuzzyScore(query: string, text: string): number {
+  return fuzzyMatchScore(query, text) ?? 0;
+}
+
+export function fuzzyMatchScore(query: string, text: string): number | null {
   const q = query.trim().toLowerCase();
   const t = text.toLowerCase();
-  if (!q) return 0;
+  if (!q) return null;
   if (t === q) return 1000;
   const tw = words(t);
   let score = t.startsWith(q) ? 200 : 0;
@@ -30,7 +34,7 @@ export function fuzzyScore(query: string, text: string): number {
     if (i >= 0) score += 60 + token.length * 4 - i * 2;
     else if (token.length >= 3 && t.includes(token)) score += 25 + token.length;
     else if (token.length >= 2 && isSubsequence(token, t.replace(/[^a-z0-9]/g, ""))) score += 8;
-    else return 0;
+    else return null;
   }
   return score - tw.length;
 }

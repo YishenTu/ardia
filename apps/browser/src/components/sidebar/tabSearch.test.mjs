@@ -11,6 +11,11 @@ test("a weak match in a long title is kept, ranked below strong ones", () => {
   assert.deepEqual(rankByQuery("py", [long, none, strong]), [strong, long]);
 });
 
+test("a match that scores exactly zero is still a match", () => {
+  const zero = row("happy cats like to nap under yellow blankets", "about:blank");
+  assert.deepEqual(rankByQuery("py", [row("Unrelated", "about:blank"), zero]), [zero]);
+});
+
 test("a host match counts when the title doesn't", () => {
   const github = row("Change is constant", "https://www.github.com/");
   assert.deepEqual(rankByQuery("github", [row("Other", "about:blank"), github]), [github]);

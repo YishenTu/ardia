@@ -496,6 +496,10 @@ public class ShellModule: Module {
       SavedKeyResponders.shared.restore(token)
     }.runOnQueue(.main)
 
+    AsyncFunction("discardKeyResponder") { (token: Int) in
+      SavedKeyResponders.shared.discard(token)
+    }.runOnQueue(.main)
+
     AsyncFunction("setSwitcherCapture") { [weak self] (active: Bool) in
       guard let self else { return }
       if let monitor = self.switcherMonitor { NSEvent.removeMonitor(monitor) }
@@ -1897,7 +1901,7 @@ final class SavedKeyResponders {
   private var next = 0
 
   func save(_ window: NSWindow?) -> Int {
-    saved.removeAll()
+    saved = saved.filter { $0.value.window != nil && $0.value.responder != nil }
     guard let window, let responder = Self.owner(of: window.firstResponder) else { return 0 }
     let editor = window.firstResponder as? NSTextView
     next += 1
@@ -1916,6 +1920,10 @@ final class SavedKeyResponders {
       editor.setSelectedRange(selection)
     }
     return true
+  }
+
+  func discard(_ token: Int) {
+    saved.removeValue(forKey: token)
   }
 
   private static func owner(of responder: NSResponder?) -> NSView? {

@@ -229,6 +229,7 @@ const Shell = requireNativeModule<{
   claimFocus(generation: number, tag: number): Promise<void>;
   saveKeyResponder?(windowId: string): Promise<number>;
   restoreKeyResponder?(token: number): Promise<boolean>;
+  discardKeyResponder?(token: number): Promise<void>;
   switcherPointerMoved?(): boolean;
   startDictation(): void;
   pickFiles(): Promise<string[]>;
@@ -279,6 +280,9 @@ export const claimFocus = (generation: number, tag: number) => void Shell.claimF
 export const saveKeyResponder = (windowId: string): Promise<number> => Shell.saveKeyResponder?.(windowId) ?? Promise.resolve(0);
 export const restoreKeyResponder = (token: number): Promise<boolean> =>
   token ? (Shell.restoreKeyResponder?.(token) ?? Promise.resolve(false)) : Promise.resolve(false);
+export const discardKeyResponder = (token: number): void => {
+  if (token) void Shell.discardKeyResponder?.(token);
+};
 export const restartSwitcherPointer = () => Shell.setSwitcherCapture(true);
 export const switcherPointerMoved = () => Shell.switcherPointerMoved?.() ?? true;
 export const pickFiles = () => Shell.pickFiles();
