@@ -1897,7 +1897,7 @@ final class SavedKeyResponders {
   private var next = 0
 
   func save(_ window: NSWindow?) -> Int {
-    saved = saved.filter { $0.value.window != nil && $0.value.responder != nil }
+    saved.removeAll()
     guard let window, let responder = Self.owner(of: window.firstResponder) else { return 0 }
     let editor = window.firstResponder as? NSTextView
     next += 1

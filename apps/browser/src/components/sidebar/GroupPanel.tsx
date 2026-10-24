@@ -38,6 +38,8 @@ function recentRows(s: BrowserState, groupId: string): Row[] {
 
 let focusOrigin: Promise<number> | null = null;
 
+const NOW_TICK_MS = 30_000;
+
 function returnFocusToPage(windowId: string) {
   const s = useBrowser.getState();
   const active = activeTabId(s, windowId);
@@ -52,7 +54,8 @@ export function GroupPanel({ groupId, windowId, anchor, windowHeight }: { groupI
   const all = useMemo(() => recentRows(useBrowser.getState(), groupId), [tabs, groupId]);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(0);
-  const [now] = useState(Date.now);
+  const [now, setNow] = useState(Date.now);
+  const exists = useBrowser((s) => !!s.groups[groupId]);
   const field = useRef<TextInput>(null);
   const scroll = useRef<ScrollView>(null);
   const offset = useRef(0);
@@ -94,6 +97,10 @@ export function GroupPanel({ groupId, windowId, anchor, windowHeight }: { groupI
   latestHandBack.current = handBack;
 
   useEffect(() => {
+    const tick = setInterval(() => setNow(Date.now()), NOW_TICK_MS);
+    return () => clearInterval(tick);
+  }, []);
+  useEffect(() => {
     if (live) takeFocus();
     else handBack("origin");
   }, [live]);
@@ -124,6 +131,7 @@ export function GroupPanel({ groupId, windowId, anchor, windowHeight }: { groupI
     handBack("page");
   };
 
+  if (!exists) return null;
   return (
     <Surface
       {...cardHoverProps}
