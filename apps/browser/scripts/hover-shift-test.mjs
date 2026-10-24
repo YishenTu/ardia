@@ -101,6 +101,26 @@ try {
       return "the group's card";
     });
   }
+
+  await rep.check("a live row under a still pointer gets its card back when its folder closes and opens again", async () => {
+    const id = `live|${below.folder}|pr1`;
+    const setFolder = (collapsed, ms) => ac(`ac.live.store.updateFolder("${below.folder}", { collapsed: ${collapsed} }); return new Promise((r) => setTimeout(r, ${ms}));`);
+    const card = () => ac(`const h = ac.sidebarRows.useSidebarUi.getState().hover; return h && h.kind + ":" + h.id;`);
+    await setFolder(false, 600);
+    const row = await ac(`return ac.sidebarRows.measureRow("w1", "${id}");`);
+    if (!row) throw new Error("the live row isn't in the sidebar");
+    await ac(`return ac.shell.devSetPointer("w1", { x: ${row.x + 40}, y: ${row.y + row.height / 2} }).then(() => new Promise((r) => setTimeout(r, 1200)));`);
+    const open = await card();
+    await setFolder(true, 900);
+    const closed = await card();
+    await setFolder(false, 900);
+    const reopened = await card();
+    await ac(`return ac.shell.devSetPointer("w1", null);`);
+    if (open !== `live:${id}`) throw new Error(`hovering the open row showed ${open ?? "no card"}`);
+    if (closed === `live:${id}`) throw new Error("the row's card stayed up after its folder closed");
+    if (reopened !== `live:${id}`) throw new Error(`after the folder opened again the card was ${reopened ?? "gone"}, not the row's`);
+    return `open ${open}, closed ${closed ?? "none"}, reopened ${reopened}`;
+  });
 } catch (error) {
   rep.record("setup", { error });
 } finally {
