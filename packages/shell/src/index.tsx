@@ -227,6 +227,8 @@ const Shell = requireNativeModule<{
   setDragEscapeCapture?(active: boolean): Promise<void>;
   cancelFocusMove(generation: number, restoringSource: boolean): Promise<void>;
   claimFocus(generation: number, tag: number): Promise<void>;
+  saveKeyResponder?(windowId: string): Promise<number>;
+  restoreKeyResponder?(token: number): Promise<boolean>;
   switcherPointerMoved?(): boolean;
   startDictation(): void;
   pickFiles(): Promise<string[]>;
@@ -274,6 +276,9 @@ export const setDragEscapeCapture = (active: boolean) => void Shell.setDragEscap
 export const cancelFocusMove = (generation: number, restoringSource: boolean) =>
   void Shell.cancelFocusMove(generation, restoringSource);
 export const claimFocus = (generation: number, tag: number) => void Shell.claimFocus(generation, tag);
+export const saveKeyResponder = (windowId: string): Promise<number> => Shell.saveKeyResponder?.(windowId) ?? Promise.resolve(0);
+export const restoreKeyResponder = (token: number): Promise<boolean> =>
+  token ? (Shell.restoreKeyResponder?.(token) ?? Promise.resolve(false)) : Promise.resolve(false);
 export const restartSwitcherPointer = () => Shell.setSwitcherCapture(true);
 export const switcherPointerMoved = () => Shell.switcherPointerMoved?.() ?? true;
 export const pickFiles = () => Shell.pickFiles();

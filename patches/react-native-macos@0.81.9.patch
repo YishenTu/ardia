@@ -776,7 +776,7 @@ index 7f1aeff436b8a51514254b72d1fb1fd1ee3b1553..dd2851fec59498902a78204041d994ed
  
  - (void)setNeedsLayout
 diff --git a/React/Views/RCTView.m b/React/Views/RCTView.m
-index 0a4efc1fff0a6e32ea1634ab5f863c211f452409..44e326774b74f03c62489dd6b4782515a626d8f9 100644
+index 0a4efc1fff0a6e32ea1634ab5f863c211f452409..4523c38072fbec1d1eb12381044d3cda17f71ca1 100644
 --- a/React/Views/RCTView.m
 +++ b/React/Views/RCTView.m
 @@ -136,6 +136,24 @@ - (RCTPlatformView *)react_findClipView // [macOS]
@@ -942,7 +942,7 @@ index 0a4efc1fff0a6e32ea1634ab5f863c211f452409..44e326774b74f03c62489dd6b4782515
  
    if (useIOSBorderRendering) {
      layer.cornerRadius = cornerRadii.topLeftHorizontal;
-@@ -1514,6 +1516,20 @@ - (BOOL)acceptsFirstResponder
+@@ -1514,28 +1516,216 @@ setBorderColor() setBorderColor(Top) setBorderColor(Right) setBorderColor(Bottom
  	return [self focusable] || [super acceptsFirstResponder];
  }
  
@@ -963,21 +963,33 @@ index 0a4efc1fff0a6e32ea1634ab5f863c211f452409..44e326774b74f03c62489dd6b4782515
  - (void)updateTrackingAreas
  {
    BOOL hasMouseHoverEvent = self.onMouseEnter || self.onMouseLeave;
-@@ -1522,6 +1538,13 @@ - (void)updateTrackingAreas
+   BOOL wouldRecreateIdenticalTrackingArea = hasMouseHoverEvent && _trackingArea && NSEqualRects(self.bounds, [_trackingArea rect]);
+ 
    if (!wouldRecreateIdenticalTrackingArea) {
++    BOOL wasOver = _trackingArea != nil && _hasMouseOver;
      if (_trackingArea) {
        [self removeTrackingArea:_trackingArea];
 +      // [Ardia: forget it too. Kept, a view that lost its hover handlers and got them back with the same bounds
 +      // counted the removed area as "identical" and never added one again: no mouseEntered/mouseExited from then on
 +      // (the sidebar's peek panel stayed out after its first peek). Ardia]
 +      _trackingArea = nil;
-+      // [Ardia: and what it knew: a view that is under the pointer when it loses its area never hears it leave, and
-+      // its next scroll (viewBoundsChanged:) would send a leave for it. Ardia]
-+      _hasMouseOver = NO;
      }
  
      if (hasMouseHoverEvent) {
-@@ -1533,9 +1556,173 @@ - (void)updateTrackingAreas
+-      _trackingArea = [[NSTrackingArea alloc] initWithRect:self.bounds
+-                                                   options:NSTrackingActiveAlways|NSTrackingMouseEnteredAndExited
+-                                                     owner:self
+-                                                  userInfo:nil];
++      NSTrackingAreaOptions options = NSTrackingActiveAlways | NSTrackingMouseEnteredAndExited | (wasOver ? NSTrackingAssumeInside : 0);
++      _trackingArea = [[NSTrackingArea alloc] initWithRect:self.bounds options:options owner:self userInfo:nil];
+       [self addTrackingArea:_trackingArea];
++      if (wasOver) {
++        [RCTView ardia_markHoverDirty];
++      }
++    } else {
++      // [Ardia: and what it knew: a view that is under the pointer when it loses its area never hears it leave, and
++      // its next scroll (viewBoundsChanged:) would send a leave for it. Ardia]
++      _hasMouseOver = NO;
      }
    }
  
@@ -1151,7 +1163,7 @@ index 0a4efc1fff0a6e32ea1634ab5f863c211f452409..44e326774b74f03c62489dd6b4782515
  - (void)mouseEntered:(NSEvent *)event
  {
    _hasMouseOver = YES;
-@@ -1768,7 +1955,7 @@ - (BOOL)handleKeyboardEvent:(NSEvent *)event {
+@@ -1768,7 +1958,7 @@ setBorderColor() setBorderColor(Top) setBorderColor(Right) setBorderColor(Bottom
    static const char kRCTViewKeyboardEventEmittedKey = 0;
    NSNumber *emitted = objc_getAssociatedObject(event, &kRCTViewKeyboardEventEmittedKey);
    BOOL alreadyEmitted = [emitted boolValue];

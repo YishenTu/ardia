@@ -1,4 +1,4 @@
-import { displayUrl, fuzzyScore } from "@ardia/core";
+import { displayUrl } from "@ardia/core";
 import { FadeLabel, Surface, Symbol } from "@ardia/shell";
 import { useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
@@ -11,6 +11,7 @@ import { sharedTabsIn, sharesTabs } from "../../store/tabShare";
 import type { Tab } from "../../store/types";
 import { tabTitle } from "./actions";
 import { setSidebarUi, useSidebarUi } from "./state";
+import { rankByQuery } from "./tabSearch";
 import { TabIcon } from "./TabIcon";
 
 type Row =
@@ -61,14 +62,6 @@ function candidates(s: BrowserState, windowId: string): { open: Row[]; closed: R
   return { open, closed };
 }
 
-const host = (url: string) => {
-  try {
-    return new URL(url).hostname.replace(/^www\./, "");
-  } catch {
-    return "";
-  }
-};
-
 export function SearchTabs({ windowId, windowWidth }: { windowId: string; windowWidth: number }) {
   const open = useSidebarUi((u) => u.searchTabs === windowId);
   return open ? <Panel windowId={windowId} windowWidth={windowWidth} /> : null;
@@ -93,13 +86,7 @@ function Panel({ windowId, windowWidth }: { windowId: string; windowWidth: numbe
     const { open, closed } = candidates(useBrowser.getState(), windowId);
     const q = query.trim();
     if (!q) return [{ title: "Open Tabs", rows: open }, { title: "Recently Closed", rows: closed.slice(0, 8) }];
-    const rank = (rows: Row[]) =>
-      rows
-        .map((r) => ({ r, score: Math.max(fuzzyScore(q, r.title), fuzzyScore(q, host(r.url)) * 0.9, fuzzyScore(q, r.url) * 0.6) }))
-        .filter((x) => x.score > 0)
-        .sort((a, b) => b.score - a.score)
-        .map((x) => x.r);
-    return [{ title: "Open Tabs", rows: rank(open) }, { title: "Recently Closed", rows: rank(closed).slice(0, 8) }];
+    return [{ title: "Open Tabs", rows: rankByQuery(q, open) }, { title: "Recently Closed", rows: rankByQuery(q, closed).slice(0, 8) }];
   }, [query, tabs, closedTabs, closedGroups, windowId]);
   const rows = sections.flatMap((s) => s.rows);
   const close = () => setSidebarUi({ searchTabs: null });
@@ -145,11 +132,11 @@ function Panel({ windowId, windowWidth }: { windowId: string; windowWidth: numbe
             placeholderTextColor={theme.placeholder}
             selectionColor={theme.selection}
             enableFocusRing={false}
-            onSubmitEditing={() => choose(rows[selected])}
             onBlur={close}
-            keyDownEvents={[{ key: "Escape" }, { key: "ArrowUp" }, { key: "ArrowDown" }]}
+            keyDownEvents={[{ key: "Enter" }, { key: "Escape" }, { key: "ArrowUp" }, { key: "ArrowDown" }]}
             onKeyDown={(e) => {
               const key = e.nativeEvent.key;
+              if (key === "Enter") choose(rows[selected]);
               if (key === "Escape") close();
               if (key === "ArrowDown") move(1);
               if (key === "ArrowUp") move(-1);
