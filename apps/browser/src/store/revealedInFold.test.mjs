@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 const { useBrowser } = await import("./browser.ts");
-const { keptEntries, showsRevealed } = await import("../components/sidebar/geometry.ts");
+const { keptEntries, pressGroupHeader } = await import("../components/sidebar/geometry.ts");
 const { groupEntries } = await import("../components/sidebar/entries.ts");
 
 const S = () => useBrowser.getState();
@@ -14,10 +14,7 @@ function setup() {
   const g = S().groupTabs([a, b, c], { pinned: false, name: "G" });
   const profileId = S().windows[w].profileId;
   const kept = () => keptEntries(S(), w, profileId, g, groupEntries(S(), g)).map((e) => e.slice(2));
-  const pressHeader = () => {
-    if (S().groups[g].collapsed && showsRevealed(S(), w, profileId, g)) S().hideRevealed(g);
-    else S().updateGroup(g, { collapsed: !S().groups[g].collapsed });
-  };
+  const pressHeader = () => pressGroupHeader(S(), w, profileId, g);
   return { w, out, a, b, c, g, kept, pressHeader };
 }
 
@@ -101,4 +98,33 @@ test("unloading a revealed tab of a pinned group forgets it, so unpinning the gr
   S().updateGroup(g, { pinned: false });
   const profileId = S().windows[w].profileId;
   assert.deepEqual(keptEntries(S(), w, profileId, g, groupEntries(S(), g)).map((e) => e.slice(2)), [b]);
+});
+
+test("a parent's header click hides the tabs revealed in the nested group that holds the focused one before it expands", () => {
+  S().hydrate({});
+  const w = S().createWindow({ url: "https://out.com/" });
+  const [a, b, c, d] = ["a", "b", "c", "d"].map((h) => S().newTab(w, { url: `https://${h}.com/`, background: true }));
+  const root = S().groupTabs([a, b, c, d], { pinned: false, name: "R" });
+  const inner = S().groupTabs([b, c], { name: "N" });
+  S().updateGroup(inner, { collapsed: true });
+  S().updateGroup(root, { collapsed: true });
+  S().activate(b);
+  S().activate(c);
+  const profileId = S().windows[w].profileId;
+  const innerKept = () => keptEntries(S(), w, profileId, inner, groupEntries(S(), inner)).map((e) => e.slice(2));
+  assert.deepEqual(innerKept(), [b, c]);
+  pressGroupHeader(S(), w, profileId, root);
+  assert.equal(S().groups[root].collapsed, true);
+  assert.deepEqual(innerKept(), [c]);
+  pressGroupHeader(S(), w, profileId, root);
+  assert.equal(S().groups[root].collapsed, false);
+});
+
+test("a tab opened in the background into a collapsed group shows under its header", () => {
+  const { a, g, kept } = setup();
+  S().updateGroup(g, { collapsed: true });
+  S().activate(a);
+  const opened = S().newTab(S().tabs[a].windowId, { url: "https://n.com/", background: true, openerId: a });
+  assert.ok(S().groups[g].tabIds.includes(opened));
+  assert.deepEqual(kept(), S().groups[g].tabIds.filter((id) => id === a || id === opened));
 });

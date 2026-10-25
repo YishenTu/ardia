@@ -35,16 +35,22 @@ export function settleRevealed(s: BrowserState, prev: BrowserState): Partial<Bro
     if (kept.length) edit()[groupId] = kept;
     else delete edit()[groupId];
   }
+  const reveal = (id: string, opened = false) => {
+    for (const g of Object.values(s.groups)) {
+      if (!g.collapsed || !g.tabIds.includes(id) || (opened && rootOf(s.groups, g.id)?.pinned)) continue;
+      const shown: string[] = revealed[g.id] ?? [];
+      if (!shown.includes(id)) edit()[g.id] = [...shown, id];
+    }
+  };
+  if (s.tabs !== prev.tabs) {
+    for (const t of Object.values(s.tabs)) if (!prev.tabs[t.id] && prev.windows[t.windowId]) reveal(t.id, true);
+  }
   for (const w of Object.values(s.windows)) {
     const before = prev.windows[w.id];
     const id = w.activeTabIds[w.profileId];
     const was = before?.activeTabIds[before.profileId];
     if (!before || !id || was === id || (was && s.tabs[id]?.pageIn === was)) continue;
-    for (const g of Object.values(s.groups)) {
-      if (!g.collapsed || !g.tabIds.includes(id)) continue;
-      const shown: string[] = revealed[g.id] ?? [];
-      if (!shown.includes(id)) edit()[g.id] = [...shown, id];
-    }
+    reveal(id);
   }
   return revealed === s.revealedInFold ? null : { revealedInFold: revealed };
 }
@@ -361,7 +367,10 @@ export const createGroupsSlice: StateCreator<BrowserState, [], [], GroupsSlice> 
   },
 
   hideRevealed(groupId) {
-    set((s) => (s.revealedInFold[groupId] ? { revealedInFold: without(s.revealedInFold, [groupId]) } : {}));
+    set((s) => {
+      const ids = [groupId, ...descendantIds(s.groups, groupId)].filter((id) => s.revealedInFold[id]);
+      return ids.length ? { revealedInFold: without(s.revealedInFold, ids) } : {};
+    });
   },
 
   addTabsToGroup(groupId, tabIds) {

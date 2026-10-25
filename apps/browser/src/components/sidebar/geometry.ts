@@ -22,7 +22,16 @@ export function keptEntries(s: BrowserState, windowId: string, profileId: string
 
 export function showsRevealed(s: BrowserState, windowId: string, profileId: string, groupId: string): boolean {
   const active = activeTabId(s, windowId, profileId);
-  return keptEntries(s, windowId, profileId, groupId, groupEntries(s, groupId)).some((e) => !active || !holdsTab(s, e, active));
+  return keptEntries(s, windowId, profileId, groupId, groupEntries(s, groupId)).some(
+    (e) => !active || !holdsTab(s, e, active) || (e.startsWith("g:") && !!s.groups[e.slice(2)]?.collapsed && showsRevealed(s, windowId, profileId, e.slice(2))),
+  );
+}
+
+export function pressGroupHeader(s: BrowserState, windowId: string, profileId: string, groupId: string) {
+  const g = s.groups[groupId];
+  if (!g) return;
+  if (g.collapsed && showsRevealed(s, windowId, profileId, groupId)) s.hideRevealed(groupId);
+  else s.updateGroup(groupId, { collapsed: !g.collapsed });
 }
 
 function revealedTabs(s: BrowserState, groupId: string): string[] {

@@ -13,7 +13,7 @@ import { commitRename, endRename, startRename } from "./actions";
 import { useDragFolded, useDragItem, useDropInto } from "./dnd";
 import { useShift, type EntryMotion } from "./entryMotion";
 import { Fold, useFold } from "./Fold";
-import { entriesHeight, entryHeight, GROUP_BORDER, GROUP_HEADER_RADIUS, GROUP_INDENT, GROUP_PAD, GROUP_RADIUS, keptEntries, showsRevealed } from "./geometry";
+import { entriesHeight, entryHeight, GROUP_BORDER, GROUP_HEADER_RADIUS, GROUP_INDENT, GROUP_PAD, GROUP_RADIUS, keptEntries, pressGroupHeader } from "./geometry";
 import { groupEntries } from "./entries";
 import { dismissHover, useRowHover } from "./hover";
 import { capture, GhostSlot, ListMotionContext, newCapture, useGroupMotion } from "./listMotion";
@@ -146,10 +146,7 @@ function GroupHeader({ groupId, windowId, collapsed, open }: { groupId: string; 
         <Pressable
           onPress={() => {
             dismissHover();
-            if (renaming) return;
-            const s = useBrowser.getState();
-            if (collapsed && showsRevealed(s, windowId, profileId, groupId)) s.hideRevealed(groupId);
-            else s.updateGroup(groupId, { collapsed: !collapsed });
+            if (!renaming) pressGroupHeader(useBrowser.getState(), windowId, profileId, groupId);
           }}
         >
           {({ pressed }) => (
