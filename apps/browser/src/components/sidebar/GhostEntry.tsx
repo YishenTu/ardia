@@ -7,7 +7,7 @@ import { groupLabel } from "../../store/organize";
 import { splitRowPanes } from "../../store/splits";
 import { tabTitle } from "./actions";
 import { groupEntries } from "./entries";
-import { GROUP_BORDER, GROUP_INDENT, GROUP_PAD, keptEntry } from "./geometry";
+import { GROUP_BORDER, GROUP_INDENT, GROUP_PAD, keptEntries } from "./geometry";
 import { pointerOnRow } from "./hover";
 import { FaviconFallback, NewTabIcon } from "../primitives";
 import { SYMBOL_PREFIX, TabIcon } from "./TabIcon";
@@ -58,7 +58,7 @@ export function snapshotEntry(s: BrowserState, windowId: string, profileId: stri
   const group = s.groups[id];
   if (!group) return null;
   const entries = groupEntries(s, id);
-  const kept = group.collapsed ? keptEntry(s, windowId, profileId, entries) : null;
+  const kept = group.collapsed ? keptEntries(s, windowId, profileId, id, entries) : [];
   const first = s.tabs[group.tabIds[0] ?? ""];
   return {
     kind: "group",
@@ -67,7 +67,7 @@ export function snapshotEntry(s: BrowserState, windowId: string, profileId: stri
     color: group.color ?? null,
     icon: group.icon || first ? { url: first?.url ?? "", favicon: first?.favicon, icon: group.icon ?? first?.customIcon, profileId: first?.profileId } : null,
     collapsed: !!group.collapsed,
-    members: (group.collapsed ? (kept ? [kept] : []) : entries).flatMap((e) => (e.startsWith("t:") ? tabShot(s, e.slice(2), false) : snapshotEntry(s, windowId, profileId, e)) ?? []),
+    members: (group.collapsed ? kept : entries).flatMap((e) => (e.startsWith("t:") ? tabShot(s, e.slice(2), false) : snapshotEntry(s, windowId, profileId, e)) ?? []),
   };
 }
 

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 const { useBrowser } = await import("../../store/browser.ts");
 const { sidebarEntries } = await import("./entries.ts");
-const { entriesHeight, entriesWithin, entryHeight, firstPaintEntries, startsOffScreen, FIRST_PAINT_HEIGHT } = await import("./geometry.ts");
+const { entriesHeight, entriesWithin, entryHeight, firstPaintEntries, keptEntries, showsRevealed, startsOffScreen, FIRST_PAINT_HEIGHT } = await import("./geometry.ts");
 await import("../../test-native-stub.mjs");
 
 const S = () => useBrowser.getState();
@@ -67,4 +67,29 @@ test("lazySidebarRows off: 64 entries at first, and no page waits", () => {
   assert.equal(firstPaintEntries(S(), "w", "default", list, false), 64);
   assert.equal(startsOffScreen(false, false), false);
   assert.equal(startsOffScreen(false, true), false);
+});
+
+test("a collapsed group keeps the focused tab and the tabs revealed in it; a pinned group's only while their page is live", () => {
+  const state = (pinned) => ({
+    windows: { w: { id: "w", profileId: "default", tabIds: ["a", "b", "c", "d", "e"], activeTabIds: { default: "d" } } },
+    tabs: {
+      a: { ...tab(1), id: "a", navigation: { url: "https://example.com" } },
+      b: { ...tab(2), id: "b", navigation: null, unloaded: true },
+      c: { ...tab(3), id: "c", navigation: null, pageIn: "x" },
+      d: { ...tab(4), id: "d", navigation: null },
+      e: { ...tab(5), id: "e", navigation: { url: "https://example.com" } },
+    },
+    groups: {
+      root: { id: "root", windowId: "w", profileId: "default", collapsed: true, pinned, tabIds: ["a", "b", "c", "d", "e"] },
+      inner: { id: "inner", parentId: "root", windowId: "w", profileId: "default", collapsed: true, pinned: false, tabIds: ["c"] },
+    },
+    splits: {},
+    revealedInFold: { root: ["a", "b", "c"], inner: ["c"] },
+  });
+  const entries = ["t:a", "t:b", "g:inner", "t:d", "t:e"];
+  assert.deepEqual(keptEntries(state(true), "w", "default", "root", entries), ["t:a", "g:inner", "t:d"]);
+  assert.deepEqual(keptEntries(state(true), "w", "default", "inner", ["t:c"]), ["t:c"]);
+  assert.deepEqual(keptEntries(state(false), "w", "default", "root", entries), ["t:a", "t:b", "g:inner", "t:d"]);
+  assert.equal(showsRevealed(state(true), "w", "default", "root"), true);
+  assert.equal(showsRevealed({ ...state(true), revealedInFold: {} }, "w", "default", "root"), false);
 });

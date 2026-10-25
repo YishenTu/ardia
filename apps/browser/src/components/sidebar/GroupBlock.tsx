@@ -13,7 +13,7 @@ import { commitRename, endRename, startRename } from "./actions";
 import { useDragFolded, useDragItem, useDropInto } from "./dnd";
 import { useShift, type EntryMotion } from "./entryMotion";
 import { Fold, useFold } from "./Fold";
-import { entryHeight, GROUP_BORDER, GROUP_HEADER_RADIUS, GROUP_INDENT, GROUP_PAD, GROUP_RADIUS, keptEntry } from "./geometry";
+import { entriesHeight, entryHeight, GROUP_BORDER, GROUP_HEADER_RADIUS, GROUP_INDENT, GROUP_PAD, GROUP_RADIUS, keptEntries, showsRevealed } from "./geometry";
 import { groupEntries } from "./entries";
 import { dismissHover, useRowHover } from "./hover";
 import { capture, GhostSlot, ListMotionContext, newCapture, useGroupMotion } from "./listMotion";
@@ -55,11 +55,11 @@ export const GroupBlock = memo(function GroupBlock({
     return !!selection?.length && !!s.groups[groupId]?.tabIds.some((id) => selection.includes(id));
   });
   const profileId = usePageProfileId();
-  const activeEntry = useBrowser((s) => keptEntry(s, windowId, profileId, entries));
+  const keptInFold = useBrowser(useShallow((s) => keptEntries(s, windowId, profileId, groupId, entries)));
   const foldedHeight = () => {
     const s = useBrowser.getState();
-    const kept = keptEntry(s, windowId, profileId, groupEntries(s, groupId));
-    return GROUP_BORDER * 2 + layout.rowHeight + (kept ? entryHeight(s, windowId, profileId, kept) + PAD : 0);
+    const kept = keptEntries(s, windowId, profileId, groupId, groupEntries(s, groupId));
+    return GROUP_BORDER * 2 + layout.rowHeight + (kept.length ? entriesHeight(s, windowId, profileId, kept) + PAD : 0);
   };
   const { wrapper, handle, headerRef } = useDragItem(`g:${groupId}`, { kind: "group", tabIds: tabIds.split(",").filter(Boolean), section, groupId, collapsed: stored, foldedHeight, parentGroup }, undefined, own?.clip);
   const tail = useDragItem(`tail:group:${groupId}`, { kind: "tail", tabIds: [], section, parentGroup: groupId });
@@ -92,7 +92,7 @@ export const GroupBlock = memo(function GroupBlock({
                   ),
                 },
           )}
-          keep={activeEntry}
+          keep={keptInFold}
           gap={layout.rowGap}
           rowHeight={(key) => entryHeight(useBrowser.getState(), windowId, profileId, key)}
           padBottom={PAD}
@@ -129,6 +129,7 @@ function GroupHeader({ groupId, windowId, collapsed, open }: { groupId: string; 
   const renaming = useSidebarUi((u) => u.renaming?.kind === "group" && u.renaming.id === groupId);
   const dropInto = useDropInto() === groupId;
   const { hovered, hoverProps } = useRowHover(windowId, collapsed && !renaming ? { kind: "group", id: groupId } : null);
+  const profileId = usePageProfileId();
   const countdown = useMeetingCountdown(groupId);
   const closeControl = useGroupCloseControl(groupId);
   if (!group) return null;
@@ -145,7 +146,10 @@ function GroupHeader({ groupId, windowId, collapsed, open }: { groupId: string; 
         <Pressable
           onPress={() => {
             dismissHover();
-            if (!renaming) useBrowser.getState().updateGroup(groupId, { collapsed: !collapsed });
+            if (renaming) return;
+            const s = useBrowser.getState();
+            if (collapsed && showsRevealed(s, windowId, profileId, groupId)) s.hideRevealed(groupId);
+            else s.updateGroup(groupId, { collapsed: !collapsed });
           }}
         >
           {({ pressed }) => (

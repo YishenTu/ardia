@@ -1,6 +1,6 @@
 import type { StateCreator } from "zustand";
 import type { BrowserState } from "./browser";
-import { newId } from "./model";
+import { newId, without } from "./model";
 import { closingGroup } from "./organize";
 import { withSplitRows } from "./splits";
 import { withNewTab } from "./tabs";
@@ -8,6 +8,7 @@ import type { BrowserWindow, ClosedGroupInfo, GroupColor, Tab, TabGroup } from "
 
 export type GroupsSlice = {
   groups: Record<string, TabGroup>;
+  revealedInFold: Record<string, string[]>;
 
   createGroup(tabIds: string[], options?: { name?: string; icon?: string | null; color?: GroupColor | null }): string;
   updateGroup(id: string, patch: Partial<Pick<TabGroup, "name" | "icon" | "color" | "collapsed" | "pinned">>): void;
@@ -17,7 +18,36 @@ export type GroupsSlice = {
   newNestedGroup(parentId: string): string;
   closeGroup(groupId: string): void;
   deleteGroup(groupId: string): void;
+  hideRevealed(groupId: string): void;
 };
+
+export const hasLivePage = (t: Tab | undefined) => !!(t && (t.navigation || t.adoptId || t.pageIn));
+
+export function settleRevealed(s: BrowserState, prev: BrowserState): Partial<BrowserState> | null {
+  if (s.windows === prev.windows && s.groups === prev.groups && s.tabs === prev.tabs) return null;
+  let revealed = s.revealedInFold;
+  const edit = () => (revealed === s.revealedInFold ? (revealed = { ...revealed }) : revealed);
+  for (const [groupId, ids] of Object.entries(s.revealedInFold)) {
+    const g = s.groups[groupId];
+    const pinned = !!(g && rootOf(s.groups, groupId)?.pinned);
+    const kept = g?.collapsed ? ids.filter((id) => s.tabs[id] && g.tabIds.includes(id) && (!pinned || hasLivePage(s.tabs[id]))) : [];
+    if (kept.length === ids.length) continue;
+    if (kept.length) edit()[groupId] = kept;
+    else delete edit()[groupId];
+  }
+  for (const w of Object.values(s.windows)) {
+    const before = prev.windows[w.id];
+    const id = w.activeTabIds[w.profileId];
+    const was = before?.activeTabIds[before.profileId];
+    if (!before || !id || was === id || (was && s.tabs[id]?.pageIn === was)) continue;
+    for (const g of Object.values(s.groups)) {
+      if (!g.collapsed || !g.tabIds.includes(id)) continue;
+      const shown: string[] = revealed[g.id] ?? [];
+      if (!shown.includes(id)) edit()[g.id] = [...shown, id];
+    }
+  }
+  return revealed === s.revealedInFold ? null : { revealedInFold: revealed };
+}
 
 export function syncGroupOrder(groups: Record<string, TabGroup>, window: BrowserWindow): Record<string, TabGroup> {
   groups = nestGroups(groups);
@@ -292,6 +322,7 @@ export function settleNesting(s: Pick<BrowserState, "groups" | "windows" | "tabs
 
 export const createGroupsSlice: StateCreator<BrowserState, [], [], GroupsSlice> = (set, get) => ({
   groups: {},
+  revealedInFold: {},
 
   createGroup(tabIds, options = {}) {
     const s = get();
@@ -327,6 +358,10 @@ export const createGroupsSlice: StateCreator<BrowserState, [], [], GroupsSlice> 
       const window = { ...w, tabIds: orderSections(w.tabIds, s.tabs, groups) };
       return { groups: syncGroupOrder(groups, window), windows: { ...s.windows, [w.id]: window } };
     });
+  },
+
+  hideRevealed(groupId) {
+    set((s) => (s.revealedInFold[groupId] ? { revealedInFold: without(s.revealedInFold, [groupId]) } : {}));
   },
 
   addTabsToGroup(groupId, tabIds) {

@@ -1,7 +1,7 @@
 import { create, type StateCreator } from "zustand";
 import { createBookmarksSlice, ensureRoots, type BookmarksSlice } from "./bookmarks";
 import { changedIds } from "./changes";
-import { createGroupsSlice, settleNesting, type GroupsSlice } from "./groups";
+import { createGroupsSlice, settleNesting, settleRevealed, type GroupsSlice } from "./groups";
 import { createHistorySlice, type HistorySlice } from "./history";
 import { IDLE_LIVE, isIncognitoProfile, pinnedFirst } from "./model";
 import { createOrganizeSlice, forgetClosedPrivateWindows, keptCleanedTabs, keptDeletedGroups, livePinTable, notePinChoices, type OrganizeSlice } from "./organize";
@@ -170,6 +170,7 @@ export const useBrowser = create<BrowserState>()(transactions.middleware(batched
       privateCleanedTabs: {},
       privateSiteMutes: {},
       selection: {},
+      revealedInFold: {},
       history: Object.fromEntries(Object.entries(data.history ?? {}).filter(([p]) => profiles[p])),
       historyReady: Object.fromEntries(Object.keys(data.history ?? {}).filter((p) => profiles[p]).map((p) => [p, true as const])),
       bookmarks,
@@ -206,6 +207,11 @@ useBrowser.subscribe((s, prev) => {
   const pinChoices = livePinTable(s.pinChoices, s);
   const pinSync = livePinTable(s.pinSync, s);
   if (pinChoices !== s.pinChoices || pinSync !== s.pinSync) useBrowser.setState({ pinChoices, pinSync });
+});
+
+useBrowser.subscribe((s, prev) => {
+  const patch = settleRevealed(s, prev);
+  if (patch) useBrowser.setState(patch);
 });
 
 useBrowser.subscribe((s, prev) => {
