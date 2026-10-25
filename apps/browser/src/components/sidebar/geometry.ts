@@ -14,17 +14,19 @@ const GAP = layout.rowGap;
 
 export type Section = "pinnedGroups" | "list";
 
-export function keptEntries(s: BrowserState, windowId: string, profileId: string, groupId: string, entries: string[]): string[] {
+export function keptEntries(s: BrowserState, windowId: string, profileId: string, foldId: string, entries: string[]): string[] {
   const active = activeTabId(s, windowId, profileId);
-  const revealed = revealedTabs(s, groupId);
+  const revealed = revealedTabs(s, foldId);
   return entries.filter((e) => (active && holdsTab(s, e, active)) || revealed.some((id) => holdsTab(s, e, id)));
+}
+
+export function keptRows(s: BrowserState, windowId: string, profileId: string, groupId: string, foldId = groupId): string[] {
+  return keptEntries(s, windowId, profileId, foldId, groupEntries(s, groupId)).flatMap((e) => (e.startsWith("g:") ? keptRows(s, windowId, profileId, e.slice(2), foldId) : [e]));
 }
 
 export function showsRevealed(s: BrowserState, windowId: string, profileId: string, groupId: string): boolean {
   const active = activeTabId(s, windowId, profileId);
-  return keptEntries(s, windowId, profileId, groupId, groupEntries(s, groupId)).some(
-    (e) => !active || !holdsTab(s, e, active) || (e.startsWith("g:") && !!s.groups[e.slice(2)]?.collapsed && showsRevealed(s, windowId, profileId, e.slice(2))),
-  );
+  return keptRows(s, windowId, profileId, groupId).some((e) => !active || !holdsTab(s, e, active));
 }
 
 export function pressGroupHeader(s: BrowserState, windowId: string, profileId: string, groupId: string) {
@@ -48,20 +50,22 @@ export function holdsTab(s: BrowserState, entry: string, tabId: string): boolean
   return id === tabId;
 }
 
-function membersHeight(s: BrowserState, windowId: string, profileId: string, groupId: string): number {
+function membersHeight(s: BrowserState, windowId: string, profileId: string, groupId: string, foldId?: string): number {
   const entries = groupEntries(s, groupId);
+  if (foldId) return entriesHeight(s, windowId, profileId, keptEntries(s, windowId, profileId, foldId, entries), foldId);
   if (!s.groups[groupId]?.collapsed) return entries.length ? entriesHeight(s, windowId, profileId, entries) + GROUP_PAD : GROUP_PAD;
   const kept = keptEntries(s, windowId, profileId, groupId, entries);
-  return kept.length ? entriesHeight(s, windowId, profileId, kept) + GROUP_PAD : 0;
+  return kept.length ? entriesHeight(s, windowId, profileId, kept, groupId) + GROUP_PAD : 0;
 }
 
-export function entryHeight(s: BrowserState, windowId: string, profileId: string, entry: string): number {
+export function entryHeight(s: BrowserState, windowId: string, profileId: string, entry: string, foldId?: string): number {
   if (!entry.startsWith("g:")) return ROW;
+  if (foldId) return membersHeight(s, windowId, profileId, entry.slice(2), foldId);
   return GROUP_BORDER * 2 + ROW + membersHeight(s, windowId, profileId, entry.slice(2));
 }
 
-export function entriesHeight(s: BrowserState, windowId: string, profileId: string, entries: string[]): number {
-  return entries.reduce((sum, e) => sum + entryHeight(s, windowId, profileId, e) + GAP, 0) - (entries.length ? GAP : 0);
+export function entriesHeight(s: BrowserState, windowId: string, profileId: string, entries: string[], foldId?: string): number {
+  return entries.reduce((sum, e) => sum + entryHeight(s, windowId, profileId, e, foldId) + GAP, 0) - (entries.length ? GAP : 0);
 }
 
 export function entriesWithin(s: BrowserState, windowId: string, profileId: string, entries: string[], height: number): number {
@@ -93,18 +97,18 @@ export function rowSpan(
     ["pinnedGroups", pinned, 0],
     ["list", list, newTabAtTop ? ROW + GAP : 0],
   ];
-  const within = (entries: string[], top: number): number | null => {
+  const within = (entries: string[], top: number, foldId?: string, header?: number): number | null => {
     for (const entry of entries) {
       if (holdsTab(s, entry, tabId)) {
         if (!entry.startsWith("g:")) return top;
         const id = entry.slice(2);
         const members = groupEntries(s, id);
-        const header = top + GROUP_BORDER;
-        if (!s.groups[id]!.collapsed) return within(members, header + ROW);
-        const kept = keptEntries(s, windowId, profileId, id, members);
-        return kept.some((e) => holdsTab(s, e, tabId)) ? within(kept, header + ROW) : header;
+        if (foldId) return within(keptEntries(s, windowId, profileId, foldId, members), top, foldId, header) ?? header ?? null;
+        const own = top + GROUP_BORDER;
+        if (!s.groups[id]!.collapsed) return within(members, own + ROW);
+        return within(keptEntries(s, windowId, profileId, id, members), own + ROW, id, own) ?? own;
       }
-      top += entryHeight(s, windowId, profileId, entry) + GAP;
+      top += entryHeight(s, windowId, profileId, entry, foldId) + GAP;
     }
     return null;
   };

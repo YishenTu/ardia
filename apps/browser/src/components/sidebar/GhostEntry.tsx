@@ -7,7 +7,7 @@ import { groupLabel } from "../../store/organize";
 import { splitRowPanes } from "../../store/splits";
 import { tabTitle } from "./actions";
 import { groupEntries } from "./entries";
-import { GROUP_BORDER, GROUP_INDENT, GROUP_PAD, keptEntries } from "./geometry";
+import { GROUP_BORDER, GROUP_INDENT, GROUP_PAD, keptRows } from "./geometry";
 import { pointerOnRow } from "./hover";
 import { FaviconFallback, NewTabIcon } from "../primitives";
 import { SYMBOL_PREFIX, TabIcon } from "./TabIcon";
@@ -58,7 +58,7 @@ export function snapshotEntry(s: BrowserState, windowId: string, profileId: stri
   const group = s.groups[id];
   if (!group) return null;
   const entries = groupEntries(s, id);
-  const kept = group.collapsed ? keptEntries(s, windowId, profileId, id, entries) : [];
+  const kept = group.collapsed ? keptRows(s, windowId, profileId, id) : [];
   const first = s.tabs[group.tabIds[0] ?? ""];
   return {
     kind: "group",
