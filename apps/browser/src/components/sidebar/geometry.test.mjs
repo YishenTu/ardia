@@ -3,7 +3,7 @@ import { test } from "node:test";
 const { useBrowser } = await import("../../store/browser.ts");
 const { groupEntries, sidebarEntries } = await import("./entries.ts");
 const { entriesHeight, entriesWithin, entryHeight, firstPaintEntries, keptEntries, rowSpan, showsRevealed, startsOffScreen, FIRST_PAINT_HEIGHT } = await import("./geometry.ts");
-await import("../../test-native-stub.mjs");
+await import("../../test-native/index.ts");
 
 const S = () => useBrowser.getState();
 const profile = { id: "default", name: "Personal", color: "plum", icon: null, createdAt: 0 };

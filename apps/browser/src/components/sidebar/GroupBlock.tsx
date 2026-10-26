@@ -23,10 +23,34 @@ import { openGroupMenu } from "./menus";
 import { registerRow, useSidebarUi } from "./state";
 import { TabIcon } from "./TabIcon";
 import { RenameField, SplitRowItem, TabRowItem } from "./TabRow";
-import { GROUP_COLORS, useSidebarTokens, withAlpha } from "./tokens";
+import { groupSurface, useSidebarTokens, withAlpha } from "./tokens";
 
 const PAD = GROUP_PAD;
 const BOX_FADE = Easing.bezier(...HOVER_CARD_FADE_CURVE);
+const NO_GROUPS: ReadonlySet<string> = new Set();
+
+type ReportInnerHover = (groupId: string, hovered: boolean) => void;
+const InnerGroupHover = createContext<ReportInnerHover | null>(null);
+
+function useInnermostHover(groupId: string, hovered: boolean) {
+  const reportToParent = useContext(InnerGroupHover);
+  const [hoveredInside, setHoveredInside] = useState(NO_GROUPS);
+  const [reportInside] = useState(() => (id: string, on: boolean) =>
+    setHoveredInside((was) => {
+      if (was.has(id) === on) return was;
+      const next = new Set(was);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    }),
+  );
+  useEffect(() => {
+    if (!reportToParent || !hovered) return;
+    reportToParent(groupId, true);
+    return () => reportToParent(groupId, false);
+  }, [reportToParent, hovered, groupId]);
+  return { innermost: hovered && hoveredInside.size === 0, reportInside };
+}
 
 function useBoxOpacity(shown: boolean) {
   const [opacity] = useState(() => new Animated.Value(shown ? 1 : 0));
@@ -79,7 +103,7 @@ export const GroupBlock = memo(function GroupBlock({
     const kept = keptEntries(s, windowId, profileId, groupId, groupEntries(s, groupId));
     return GROUP_BORDER * 2 + layout.rowHeight + (kept.length ? entriesHeight(s, windowId, profileId, kept, groupId) + PAD : 0);
   };
-  const { wrapper, handle, headerRef } = useDragItem(`g:${groupId}`, { kind: "group", tabIds: tabIds.split(",").filter(Boolean), section, groupId, collapsed: stored, foldedHeight, parentGroup }, undefined, own?.clip);
+  const { wrapper, handle, headerRef } = useDragItem(`g:${groupId}`, { kind: "group", tabIds: tabIds.split(",").filter(Boolean), section, groupId, collapsed: stored, foldedHeight, parentGroup }, own?.clip);
   const tail = useDragItem(`tail:group:${groupId}`, { kind: "tail", tabIds: [], section, parentGroup: groupId });
 
   const fold = useFold(collapsed || flat);
@@ -91,11 +115,10 @@ export const GroupBlock = memo(function GroupBlock({
   const [moved, movedRef] = useShift(own?.shift ?? null);
   const box = useGroupHover(windowId, groupId);
   const dropInto = useDropInto() === groupId;
-  const boxOpacity = useBoxOpacity(box.hovered || dropInto);
+  const nested = useInnermostHover(groupId, box.hovered && !flat);
+  const boxOpacity = useBoxOpacity(nested.innermost || dropInto);
 
-  const spec = color ? GROUP_COLORS[color] : null;
-  const fill = spec ? withAlpha(spec.hex, 0.16) : tokens.groupFill;
-  const stroke = spec ? withAlpha(spec.hex, 0.3) : tokens.groupStroke;
+  const { fill, stroke } = groupSurface(color, tokens);
 
   return (
     <Animated.View ref={wrapper.ref} style={wrapper.style}>
@@ -103,36 +126,38 @@ export const GroupBlock = memo(function GroupBlock({
         <Animated.View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0, opacity: chrome.box }}>
           <Animated.View style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0, borderRadius: GROUP_RADIUS, backgroundColor: fill, borderWidth: GROUP_BORDER, borderColor: stroke, opacity: boxOpacity }} />
         </Animated.View>
-        <Animated.View style={{ paddingHorizontal: chrome.inset, paddingVertical: chrome.border }}>
-          <Animated.View pointerEvents={flat ? "none" : "auto"} style={{ marginHorizontal: -PAD, height: chrome.header, opacity: chrome.box, overflow: "hidden" }}>
+        <Animated.View style={{ paddingVertical: chrome.border }}>
+          <Animated.View pointerEvents={flat ? "none" : "auto"} style={{ height: chrome.header, opacity: chrome.box, overflow: "hidden" }}>
             <View ref={headerRef} {...handle}>
               <GroupHeader groupId={groupId} windowId={windowId} collapsed={collapsed} open={fold.open} />
             </View>
           </Animated.View>
-          <FoldScopeContext.Provider value={flat ? outer : scope}>
-            <Fold
-              fold={fold}
-              collapsed={collapsed || flat}
-              entries={motion.slots(entries).map((slot) =>
-                "ghost" in slot
-                  ? { key: slot.ghost.key, ghost: true, node: <GhostSlot snapshot={slot.ghost.snapshot} top={slot.top} opacity={slot.ghost.opacity} /> }
-                  : {
-                      key: slot.entry,
-                      node: (
-                        <Entry entry={slot.entry} section={section} groupId={groupId} motion={motion.motion(slot.entry)} />
-                      ),
-                    },
-              )}
-              keep={keptInFold}
-              gap={layout.rowGap}
-              rowHeight={(key) => entryHeight(useBrowser.getState(), windowId, profileId, key)}
-              padTop={collapsed || flat ? 0 : headGap(entries[0])}
-              padBottom={flat ? 0 : PAD}
-              indent={chrome.indent}
-              mountClosed={selectedInside}
-              footer={<Animated.View ref={tail.wrapper.ref} style={tail.wrapper.style} />}
-            />
-          </FoldScopeContext.Provider>
+          <InnerGroupHover.Provider value={nested.reportInside}>
+            <FoldScopeContext.Provider value={flat ? outer : scope}>
+              <Fold
+                fold={fold}
+                collapsed={collapsed || flat}
+                entries={motion.slots(entries).map((slot) =>
+                  "ghost" in slot
+                    ? { key: slot.ghost.key, ghost: true, node: <GhostSlot snapshot={slot.ghost.snapshot} top={slot.top} opacity={slot.ghost.opacity} /> }
+                    : {
+                        key: slot.entry,
+                        node: (
+                          <Entry entry={slot.entry} section={section} groupId={groupId} motion={motion.motion(slot.entry)} />
+                        ),
+                      },
+                )}
+                keep={keptInFold}
+                gap={layout.rowGap}
+                rowHeight={(key) => entryHeight(useBrowser.getState(), windowId, profileId, key)}
+                padTop={collapsed || flat ? 0 : headGap(entries[0])}
+                padBottom={flat ? 0 : PAD}
+                indent={chrome.indent}
+                mountClosed={selectedInside}
+                footer={<Animated.View ref={tail.wrapper.ref} style={tail.wrapper.style} />}
+              />
+            </FoldScopeContext.Provider>
+          </InnerGroupHover.Provider>
         </Animated.View>
         {motion.tail ? <Animated.View style={{ marginTop: motion.tail }} /> : null}
       </View>
@@ -143,7 +168,7 @@ export const GroupBlock = memo(function GroupBlock({
 function useChrome(shown: Animated.Value) {
   return useMemo(() => {
     const to = (value: number) => shown.interpolate({ inputRange: [0, 1], outputRange: [0, value], extrapolate: "clamp" });
-    return { box: to(1), border: to(GROUP_BORDER), inset: to(GROUP_BORDER + PAD), header: to(layout.rowHeight), indent: to(GROUP_INDENT) };
+    return { box: to(1), border: to(GROUP_BORDER), header: to(layout.rowHeight), indent: to(GROUP_INDENT) };
   }, [shown]);
 }
 
