@@ -157,7 +157,7 @@ app build, "JS" only a bundle.
 | 11 | **Drop unused locales and maybe SwiftShader from the bundle** (`*.lproj` other than en; `libvk_swiftshader.dylib` 21 MB is WebGL's software fallback) | first launch of an unscanned copy | first launch −0.4 to −0.6 s | locales low (the UI locale is the bundle's, English); SwiftShader medium (GPU-blocklisted Macs) | packaging | proposed |
 | 12 | **Official engine build** (`is_official_build=true`, ThinLTO, PGO; today none of them) | Chrome's start (150 ms), the renderer, page loads; fewer bytes to scan | warm −20 to −40; first launch −0.3 to −0.8 s; every page faster | medium: a 5 to 8 h rebuild, longer incremental builds after | engine | owner's call |
 | 13 | **Static first frame**: save each window's last frame at quit, show it in the window at once (~60 ms, before Chrome's loop) and swap in the live content when it commits | perceived window | perceived −350 / −850 | medium–high: a stale frame that can't be clicked, multi-window, appearance changes | native | wacky |
-| 14 | **Native command bar first**: a plain text field in the window from its first frame that takes typing (the type-ahead holding `Windows.swift` already does for new windows) and hands it to the React command bar | "command bar usable" | usable at window time regardless of JS | medium | native | wacky |
+| 14 | **Native command bar first**: a plain text field in the window from its first frame that takes typing (the type-ahead holding `WindowManager+TypeAhead.swift` already does for new windows) and hands it to the React command bar | "command bar usable" | usable at window time regardless of JS | medium | native | wacky |
 | 15 | **Trim Chrome's startup services** (component updater, optimization guide, segmentation platform, Safe Browsing DB at launch) with `--disable-features`/delays | Chrome's start | −20 to −50 | medium: features that need them | engine switches | needs a startup trace |
 
 Not worth it now: the Hermes bundle (bytecode, 18 to 26 ms to evaluate with inline requires; splitting it saves little
@@ -171,7 +171,7 @@ warm tab, gets a page at launch).
   the bundle 592 → 418 MB, UUIDs and exports unchanged (the script checks), unstripped files in `dist/<v>/symbols`
   (keep that folder with each release: it is what symbolicates a crash in Chrome's framework). `smoke.sh` on a
   stripped, re-signed copy of 0.2.27: every check passes but the two notarization ones (the copy isn't notarized).
-- **be2ca8f7** `ARDIA_PREWARM=1` exits at the top of `main.swift`; `UpdatePrewarm` (`packages/shell/ios/Updater.swift`)
+- **be2ca8f7** `ARDIA_PREWARM=1` exits at the top of `main.swift`; `UpdatePrewarm` (`packages/shell/ios/UpdatePrewarm.swift`)
   runs the update Sparkle staged in `~/Library/Caches/<bundle id>/org.sparkle-project.Sparkle/Installation` when
   `willInstallUpdateOnQuit` fires. Lab (calm, Sparkle 2.9.6 updating a 0.2.26 copy to 0.2.27): the first launch's
   pre-`main` time 39/52 ms with the prewarm against 175–232 ms without. Not yet exercised through a real
@@ -223,7 +223,7 @@ warm tab, gets a page at launch).
 
 At engineDidStart, before React Native starts, the focused saved window shows natively. It holds the session's frame,
 the real backdrop (shaders' `ArdiaEarlyBackdrop`), a picture of the chrome taken at the last quit, and the launch tab's
-live page in a rounded cover. When JS opens that window it claims the same NSWindow (`ArdiaCoreEarlyWindow.mm`), so the
+live page in a rounded cover. When JS opens that window it claims the same NSWindow (`ArdiaEarlyWindow.mm`), so the
 handoff makes no second window.
 
 - **Gates.** The early window never shows on a login-item launch, for a launch that opens documents or URLs, while
@@ -253,7 +253,7 @@ handoff makes no second window.
   its page stays claimable past 15 s; one without a page is closed. The user can close it before the claim, and JS then
   gets the same `close` event a normal close sends. Clearing history and turning session restore off erase the
   pictures, whatever the switch says.
-- **Launch look** (issue #317). At quit JS also writes `launch-look.json` (`lib/launchLook.ts`): each saved tab's last
+- **Launch look** (issue #317). At quit JS also writes `launch-look.json` (`state/windows/launchLook.ts`): each saved tab's last
   page colour and the favicons, with their icon themes, that the session's tabs showed (240 icons at most). They are
   seeded before the first render, so RN's first frame has the tiles' icons, their tint and the address bar's colour
   instead of letter fallbacks and a white bar. A restored tab keeps its saved colour until its page reports one, leaves
@@ -267,12 +267,11 @@ handoff makes no second window.
   malloc's allocated objects +1.2 to +1.6 MB with or without the picture, and GPU-owned memory +1.1 MB (0.5 MB without
   the picture). Without the window shown early, the difference goes away. Footprint alone can't see it: PartitionAlloc's
   committed memory moves ±3 MB from run to run. Open: which objects showing the NSWindow before RN keeps.
-- **Kill switches.** `ARDIA_EARLY_WINDOW=off` or `ARDIA_SWITCHES=earlyWindow=off` (environment), and the remote
-  `launchTab` switch, which turns this off with the launch tab.
+- **Kill switch.** The remote `launchTab` switch turns this off with the launch tab (the early window's own environment
+  switch went on 2026-10-26, after it shipped in 0.2.40).
 
 The content blocker's launch hold (84e75272) is separate. Restored pages wait for uBlock Origin, about 200 to 240 ms
-on a warm launch, and the leak probe's escaped ad-host beacons go from 6 to 0. `ARDIA_BLOCKER_LAUNCH_HOLD=off` turns
-it off.
+on a warm launch, and the leak probe's escaped ad-host beacons go from 6 to 0. The hold was dropped on 2026-10-17.
 
 ## Restored tab paint (2026-10-19)
 

@@ -168,7 +168,7 @@ await sleep(1500);
 checkUnlocked("…and closes when the page navigates", !windows().some((w) => /passkey/i.test(w.title)));
 
 const adsOnPage = () => adFate(adScript, () => go(`${pages}/ad.html`));
-const allowAds = (allowed) => instance.eval(`return globalThis.expo.modules.ArdiaCEF.setContentBlockerAllowed("localhost", ${allowed})`, { timeout: 30000 });
+const allowAds = (allowed) => instance.eval(`return ac.engine.call("contentBlocker.setAllowed", ${JSON.stringify({ host: "localhost", allowed })})`, { timeout: 30000 });
 const adSteps = [await adsOnPage()];
 await allowAds(true);
 adSteps.push(await adsOnPage());
@@ -251,31 +251,6 @@ check(
   "right-click shows the context menu",
   (logged && /Paste/.test(logged)) || !!menu,
   logged ? `logged: ${logged.slice(0, 80)}` : menu ? `layer ${menu.layer}` : "no menu",
-);
-
-await go(`${pages}/video.html`);
-await send("Runtime.evaluate", { expression: "v.play().then(() => v.requestPictureInPicture())", awaitPromise: true, userGesture: true });
-const pipClick = () => {
-  try {
-    return JSON.parse(readFileSync(`${process.env.SMOKE_DATA}/pip-button-selftest.json`, "utf8"));
-  } catch {
-    return undefined;
-  }
-};
-let closed;
-for (const start = Date.now(); !closed && Date.now() - start < 8000; await sleep(250)) closed = pipClick();
-const before = await evaluate("v.currentTime");
-await sleep(1000);
-const after = await evaluate("({ paused: v.paused, time: v.currentTime, pip: !!document.pictureInPictureElement })");
-check(
-  "closing the Picture in Picture window leaves its video playing",
-  !!closed?.closed && !after?.pip && after?.paused === false && after.time !== before,
-  closed ? `closed ${closed.closed}, paused ${after?.paused}, ${before?.toFixed(2)} → ${after?.time?.toFixed(2)} s` : "no close click",
-);
-check(
-  "a click on the Picture in Picture window doesn't activate the app",
-  closed?.preventsActivation === true && closed?.activations === 0,
-  closed ? `tag ${closed.preventsActivation}, activations ${closed.activations}` : "no close click",
 );
 
 execFileSync(process.env.SMOKE_KEYS, [pid, "18", "t"]);

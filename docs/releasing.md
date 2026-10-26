@@ -28,7 +28,7 @@ GitHub Actions. Each has these assets:
 Each version's notes are a file in the repo, `docs/release-notes/<version>.md` (how to write one:
 `docs/release-notes/README.md`). The GitHub release, the update dialog and the website's
 `https://ardia.dev/release-notes` all come from it. The first launch after an update opens
-`/release-notes#<version>` in a new tab (`apps/browser/src/lib/releaseNotesPage.ts`), so the site has to be
+`/release-notes#<version>` in a new tab (`apps/browser/src/state/releaseNotes/releaseNotesPage.ts`), so the site has to be
 deployed with the new entry by the time the update reaches people.
 
 ## Channels
@@ -37,7 +37,7 @@ Ardia is one app with two Sparkle channels. A stable item in the appcast has no 
 `<sparkle:channel>nightly</sparkle:channel>` (`generate_appcast --channel nightly`). Sparkle skips items on a channel the
 app doesn't allow, and allows none by default, so every shipped build (all on Sparkle 2.9.6, which has channels) and
 every copy on Stable sees only stable items. A copy on Nightly allows `nightly` (`allowedChannels(for:)` in
-`packages/shell/ios/Updater.swift`) and so gets the newest of both.
+`packages/shell/ios/AppUpdater.swift`) and so gets the newest of both.
 
 - **Which channel a copy is on.** Settings › General › "Update channel" (Stable / Nightly), kept in the defaults key
   `ACUpdateChannel`. Until the user picks, it's the channel of the build that first ran: the `ACUpdateChannel` key in
@@ -200,7 +200,7 @@ pass on it.
 
 To check the after-update tab too: in that data dir, set `lastVersion` in `release-notes.json` to the
 previous version (`{"version":1,"lastVersion":"<previous>","pending":null}`) and relaunch with
-`ARDIA_RELEASE_NOTES=1` added (test instances skip the tab without it). `curl localhost:<port>/json` must
+`ARDIA_INSTANCE=releaseNotes` added (test instances skip the tab without it). `curl localhost:<port>/json` must
 list one `…/release-notes#<version>` page; a second launch opens none.
 
 ## CI releases
@@ -286,7 +286,7 @@ id, executable, Developer ID team, designated requirement, feed and key), so Spa
 macOS keeps its permissions, keychain items and passkeys.
 
 Nothing is migrated. A release build without `ARDIA_DATA_DIR` opens the CEF build's data where it is
-(`InstalledDataDirectory` in `packages/ardiacore/ios/ArdiaCoreHost.mm`): Chrome's user data dir
+(`InstalledDataDirectory` in `packages/ardiacore/ios/ArdiaProfiles.mm`): Chrome's user data dir
 `~/Library/Application Support/com.ardia.browser/Chromium` (profiles `Default` and `Profile <id>`), with the app's
 own documents (session, settings) in the folder above. Both engines are Chromium 154.0.8037.58, so every store keeps its
 format, and both read the same "Ardia Safe Storage" keychain item, which trusts the app by its designated

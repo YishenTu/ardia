@@ -2,6 +2,7 @@ import type {
   AppEvent,
   BangListReply,
   CommandEvent,
+  LaunchConfig,
   OpenWindowOptions,
   ShellNativeModules,
   ShellOptionalNativeModules,
@@ -28,7 +29,16 @@ export const docs = new Map<string, string>();
 export const heldSaves = { on: false, queue: [] as (() => void)[] };
 export const bangListServer: { reply: ((etag: string | null) => Promise<BangListReply>) | null } = { reply: null };
 export const appInfo: Partial<SystemInfo> = { appVersion: "1.0" };
-export const environment = new Map<string, string>();
+export const launch: LaunchConfig = {
+  dataDirectory: null,
+  background: false,
+  isolated: false,
+  testInstance: false,
+  instance: {},
+  switches: {},
+  trace: [],
+  test: {},
+};
 
 export type FakeWindow = OpenWindowOptions & { title?: string; trafficLightsCenter?: [number, number] | null };
 const shellEvents = nativeEvents();
@@ -47,6 +57,23 @@ const shell: Modules["ArdiaShell"] = {
   showMenu: () => Promise.resolve(null),
   copyText: () => {},
   setSwitcherCapture: () => Promise.resolve(),
+  setDragEscapeCapture: () => Promise.resolve(),
+  saveKeyResponder: () => Promise.resolve(0),
+  restoreKeyResponder: () => Promise.resolve(false),
+  discardKeyResponder: () => Promise.resolve(),
+  switcherPointerMoved: () => true,
+  pickFolder: () => Promise.resolve(null),
+  animateWindowClose: () => Promise.resolve(),
+  restoreFullScreen: () => Promise.resolve(),
+  watchLeftEdge: () => Promise.resolve(),
+  dragPreviewBegin: () => Promise.resolve(),
+  dragPreviewPage: () => Promise.resolve(),
+  dragPreviewUpdate: () => Promise.resolve(),
+  dragPreviewCancel: () => Promise.resolve(),
+  dragPreviewPlaceholder: () => Promise.resolve(),
+  dragPreviewEnd: () => Promise.resolve(),
+  raiseView: () => Promise.resolve(),
+  windowFrame: () => Promise.resolve(null),
   cancelFocusMove: () => Promise.resolve(),
   claimFocus: () => Promise.resolve(),
   startDictation: () => {},
@@ -60,9 +87,7 @@ const shell: Modules["ArdiaShell"] = {
       else land();
     }),
   removeDocument: (name) => void docs.delete(name),
-  get fetchBangList() {
-    return bangListServer.reply ?? undefined;
-  },
+  fetchBangList: (etag) => (bangListServer.reply ? bangListServer.reply(etag) : unfaked("ArdiaShell", "fetchBangList")),
   openWindow: (id, options) => {
     windows.open.set(id, { ...options });
     if (options.focus !== false) windows.focused = id;
@@ -123,8 +148,7 @@ const app: Modules["ArdiaApp"] = {
   replyToScript: () => Promise.resolve(),
   systemInfo: () => ({ ...appInfo }) as SystemInfo,
   openExternalURL: () => Promise.resolve(false),
-  launchEnvironment: (name) => environment.get(name) ?? null,
-  killSwitchEnvironment: (name) => environment.get(name) ?? null,
+  launchConfig: () => structuredClone(launch),
   playIntroMusic: () => Promise.resolve(),
   setIntroMusicMuted: () => Promise.resolve(),
   stopIntroMusic: () => Promise.resolve(),
@@ -140,6 +164,8 @@ const app: Modules["ArdiaApp"] = {
   devClick: () => Promise.resolve({}),
   crashReports: () => Promise.resolve([]),
   devCrash: () => Promise.resolve(),
+  devLeftEdgePointer: () => Promise.resolve(false),
+  devLeftEdgeStats: () => Promise.resolve({}),
 };
 
 const system: Modules["ArdiaSystem"] = {
@@ -157,6 +183,7 @@ const system: Modules["ArdiaSystem"] = {
   menuShortcuts: () => Promise.resolve([]),
   recordShortcut: () => Promise.resolve(null),
   cancelRecording: () => Promise.resolve(),
+  setThinScrollBars: () => Promise.resolve(),
 };
 
 const calendarEvents = nativeEvents();
@@ -186,6 +213,12 @@ const translate: Modules["ArdiaTranslate"] = {
   translateBlocks: (_source, _target, blocks) => Promise.resolve(blocks),
 };
 
+const magnifyArea: Modules["ArdiaMagnifyArea"] = { devMagnify: () => unfaked("ArdiaMagnifyArea", "devMagnify") };
+const fileDrop: Modules["ArdiaFileDrop"] = {
+  devDrag: () => unfaked("ArdiaFileDrop", "devDrag"),
+  devLastFileDrag: () => Promise.resolve([]),
+};
+
 export const shellNativeModules: Modules = {
   ArdiaShell: shell,
   ArdiaApp: app,
@@ -196,6 +229,8 @@ export const shellNativeModules: Modules = {
   ArdiaDockSelection: { iconTheme: () => Promise.resolve(null) },
   ArdiaInlineCompletion: { complete: () => Promise.resolve(0) },
   ArdiaTranslate: translate,
+  ArdiaMagnifyArea: magnifyArea,
+  ArdiaFileDrop: fileDrop,
 };
 
 const cliEvents = nativeEvents();
@@ -220,17 +255,7 @@ const userScripts: ShellOptionalNativeModules["ArdiaUserScripts"] = {
   },
 };
 
-const popoverBubble: ShellOptionalNativeModules["ArdiaPopoverBubble"] = { isAvailable: () => false };
-const magnifyArea: ShellOptionalNativeModules["ArdiaMagnifyArea"] = { devMagnify: () => unfaked("ArdiaMagnifyArea", "devMagnify") };
-const fileDrop: ShellOptionalNativeModules["ArdiaFileDrop"] = {
-  devDrag: () => unfaked("ArdiaFileDrop", "devDrag"),
-  devLastFileDrag: () => Promise.resolve([]),
-};
-
 export const shellOptionalNativeModules: OptionalModules = {
-  ArdiaPopoverBubble: () => popoverBubble,
-  ArdiaMagnifyArea: () => magnifyArea,
-  ArdiaFileDrop: () => fileDrop,
   ArdiaCli: () => cli,
   ArdiaUserScripts: () => (testGlobals.acTestUserScripts ? userScripts : null),
 };
