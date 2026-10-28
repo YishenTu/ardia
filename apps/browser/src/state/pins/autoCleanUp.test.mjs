@@ -136,6 +136,20 @@ test("with tabs shared across windows, a restored tab and its copy in the other 
   assert.equal(Object.values(S().tabs).filter((t) => t.url === "https://b.com/").length, 1, "the copy stays after its source window closes");
 });
 
+test("with tabs shared across windows, clean-up waits for the latest restore of any copy", () => {
+  const [w, , b] = windowWith("a", "b", "c", "d");
+  S().updateSettings({ shareTabsAcrossWindows: true });
+  const other = S().createWindow();
+  const usedAt = Date.now() - 2 * 60 * MIN;
+  const copies = () => Object.values(S().tabs).filter((t) => t.url === "https://b.com/");
+  for (const t of copies()) S().updateTab(t.id, { lastActiveAt: usedAt, restoredAt: t.windowId === w ? usedAt : Date.now() });
+  assert.equal(copies().length, 2);
+  assert.deepEqual(cleanUpCandidates(S(), w, 30 * MIN).filter((id) => id === b), []);
+  S().cleanUpTabs(w, { inactiveForMs: 30 * MIN });
+  assert.equal(copies().length, 2, "the copy restored just now keeps both");
+  assert.ok(S().windows[other]);
+});
+
 test("switching the setting off stops the timer", (t) => {
   t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: Date.now() });
   try {

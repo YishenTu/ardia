@@ -3,7 +3,7 @@ import { activeTabId, inPinnedContainer, pinSection, viewTabIds } from "../brows
 import { hasPage } from "../tabs/pageSession";
 import { holderOf } from "./pinShare";
 import { splitOf } from "../splits/splits";
-import { lastUsedOf, sharedLastUsed } from "../tabs/tabShare";
+import { lastUsedOf, restoredAtOf, sharedLastUsed, sharedRestoredAt } from "../tabs/tabShare";
 import type { ClosedTab, Tab, TabGroup } from "../browser/types";
 
 export type ClearedTabs = {
@@ -102,13 +102,14 @@ function inactivity(s: BrowserState, windowId: string) {
   const inSplit = new Set(Object.values(s.splits).flatMap((v) => v.tabIds));
   const keep = (t: Tab) => t.id === active || inPinnedContainer(s, t.id) || s.live[t.id]?.playingAudio;
   const used = sharedLastUsed(s);
+  const restored = sharedRestoredAt(s);
   return {
     active,
     inSplit,
     used,
     keep,
     expires: (t: Tab) => !keep(t) && !grouped.has(t.id) && !inSplit.has(t.id),
-    lastUsed: (t: Tab) => Math.max(lastUsedOf(used, t), deselectedAt.get(t.id) ?? 0, t.restoredAt ?? 0),
+    lastUsed: (t: Tab) => Math.max(lastUsedOf(used, t), deselectedAt.get(t.id) ?? 0, restoredAtOf(restored, t)),
   };
 }
 
