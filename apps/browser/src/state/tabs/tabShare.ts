@@ -125,7 +125,7 @@ function conformList(input: BrowserState, windowId: string, profileId: string, s
     const t = same.find(hasPage) ?? same[0];
     if (!t) {
       const { unloaded: _, ...made } = copyOf(src, windowId, false);
-      const copy = { ...made, lastActiveAt: src.lastActiveAt };
+      const copy = { ...made, lastActiveAt: src.lastActiveAt, ...(src.restoredAt ? { restoredAt: src.restoredAt } : {}) };
       tabs[copy.id] = copy;
       live[copy.id] = IDLE_LIVE;
       used.add(copy.id);
