@@ -162,7 +162,9 @@ test("Restore All on a page that's open again keeps the restored tab and cleans 
   S().restoreCleaned();
   const restored = model.viewTabIds(S(), w).find((id) => id !== again && S().tabs[id].url === "https://b.com/");
   assert.deepEqual(cleanUpCandidates(S(), w, 30 * MIN), [again]);
-  assert.ok(restored);
+  S().cleanUpTabs(w, { inactiveForMs: 30 * MIN });
+  assert.ok(!S().tabs[again], "the other copy is cleaned up");
+  assert.ok(S().tabs[restored], "the restored tab stays");
 });
 
 test("switching the setting off stops the timer", (t) => {
