@@ -150,6 +150,21 @@ test("with tabs shared across windows, clean-up waits for the latest restore of 
   assert.ok(S().windows[other]);
 });
 
+test("Restore All on a page that's open again keeps the restored tab and cleans up the other copy", (t) => {
+  t.mock.timers.enable({ apis: ["Date"], now: Date.now() });
+  const [w, , b] = windowWith("a", "b", "c", "d");
+  S().updateTab(b, { lastActiveAt: Date.now() - 2 * 60 * MIN });
+  S().cleanUpTabs(w, { inactiveForMs: 30 * MIN });
+  assert.ok(!S().tabs[b], "cleaned up");
+  t.mock.timers.tick(MIN);
+  const again = S().newTab(w, { url: "https://b.com/", background: true });
+  t.mock.timers.tick(MIN);
+  S().restoreCleaned();
+  const restored = model.viewTabIds(S(), w).find((id) => id !== again && S().tabs[id].url === "https://b.com/");
+  assert.deepEqual(cleanUpCandidates(S(), w, 30 * MIN), [again]);
+  assert.ok(restored);
+});
+
 test("switching the setting off stops the timer", (t) => {
   t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: Date.now() });
   try {
