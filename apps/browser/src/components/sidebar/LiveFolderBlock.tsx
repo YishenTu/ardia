@@ -26,7 +26,8 @@ import { registerRow } from "../../state/sidebar/sidebarUi";
 import { LiveFolderIcon } from "./LiveFolderIcon";
 import { groupBoxAtRest, groupSurface, TAB_ROW, useSidebarTokens } from "./tokens";
 import { RefreshSpinner } from "./RefreshSpinner";
-import { SidebarRowLabel, SidebarRowSurface } from "./SidebarRow";
+import { SidebarRowSurface } from "./SidebarRow";
+import { FolderHeaderTitle } from "./FolderHeaderTitle";
 import { MoreRow, NoteRow, SectionTitle, StackRow } from "./LiveFolderRows";
 import { LiveItemRow } from "./LiveItemRow";
 import { CompletedFooter, useCompletedShown } from "./CompletedFooter";
@@ -157,7 +158,7 @@ function FolderHeader({ folderId, windowId, collapsed }: { folderId: string; win
             <Squish scale={squish.scale}>
             <SidebarRowSurface fill={ink.clear} cornerRadius={GROUP_INNER_RADIUS}>
               <LiveFolderIcon folder={folder} open={!collapsed} />
-              <SidebarRowLabel text={folder.name} weight="medium" color={tokens.groupTitle} />
+              <FolderHeaderTitle label={folder.name} color={tokens.groupTitle} />
               {status?.error ? (
                 <Pressable onPress={() => fixError(windowId, status.error)} tooltip={errorText(status.error.kind, status.error.source)} style={{ marginRight: space.xxs }}>
                   <Symbol name="exclamationmark.triangle.fill" size={10} color={colors.pending} style={{ width: 18, height: 18 }} />
