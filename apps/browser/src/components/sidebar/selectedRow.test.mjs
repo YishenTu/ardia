@@ -3,6 +3,9 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 const { rowAway, visibleSpan } = await import("./selectedRow.ts");
 const { GLOW_ROOM } = await import("./pageLayout.ts");
+import { mount } from "../../test-hooks.mjs";
+globalThis.require ??= (id) => ({ asset: id });
+const { useListFrame } = await import("./SelectedRowPill.tsx");
 
 const row = (y, height = 34) => ({ y, height });
 
@@ -37,5 +40,28 @@ test("the pill's shown state lives in the pill, so its showing never re-renders 
   const tracker = pill.slice(pill.indexOf("export function useSelectedRowAway"), pill.indexOf("export function SelectedRowPill"));
   assert.doesNotMatch(tracker, /useState<RowAway>/);
   assert.match(pill, /const away = useSyncExternalStore\(source\.subscribe, source\.read, source\.read\);/);
-  assert.match(page, /<SelectedRowPill windowId=\{windowId\} away=\{selectedRow\.away\}/);
+  assert.match(page, /<SelectedRowPillFrame frame=\{listFrame\} lift=\{edgeLift\} windowId=\{windowId\} away=\{selectedRow\.away\}/);
+});
+
+test("the list's frame for the pill lives outside the page's state, so a list layout at launch never re-renders the sidebar page", () => {
+  const page = readFileSync(new URL("./SidebarPage.tsx", import.meta.url), "utf8");
+  assert.match(page, /const listFrame = useListFrame\(\);/);
+  assert.match(page, /onLayout=\{listFrame\.onLayout\}/);
+  assert.doesNotMatch(page, /setListFrame/);
+});
+
+test("the list frame notifies the pill only when the list's top or height changes", (t) => {
+  const frame = mount(() => useListFrame());
+  t.after(() => frame.unmount());
+  const source = frame.value;
+  let notified = 0;
+  source.subscribe(() => notified++);
+  const layout = (y, height) => source.onLayout({ nativeEvent: { layout: { x: 0, y, width: 200, height } } });
+  layout(40, 600);
+  layout(40, 600);
+  assert.equal(notified, 1);
+  assert.deepEqual(source.read(), { top: 40, height: 600 });
+  layout(40, 520);
+  assert.equal(notified, 2);
+  assert.deepEqual(source.read(), { top: 40, height: 520 });
 });

@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type RefObject } from "react";
-import { Animated, Pressable, View, type ScrollView } from "react-native";
+import { Animated, Pressable, View, type LayoutChangeEvent, type ScrollView } from "react-native";
 import { useActiveTabId, useTab } from "../../state/browser/hooks";
 import { revealTab, selectedTabIn, watchRowsMoved } from "../../state/sidebar/reveal";
 import { notePageOverlay } from "../../state/telemetry/usage";
 import { capsule, Panel, reduceMotion, Symbol } from "../ui";
 import { useTheme } from "../ui/theme";
 import { SHADOWS } from "../window/tokens";
-import type { SidebarGeometry } from "./pageLayout";
+import { GLOW_ROOM, type SidebarGeometry } from "./pageLayout";
 import { locateTab, rowAway, type RowAway, type RowSpot } from "./selectedRow";
 import { TabIcon } from "./TabIcon";
 import { SELECTED_ROW_PILL, SELECTED_ROW_PILL_MOTION, SELECTED_ROW_REVEAL_SETTLE_MS, useSidebarTokens } from "./tokens";
@@ -103,6 +103,40 @@ export function useSelectedRowAway(windowId: string, geometry: RefObject<Sidebar
 }
 
 export type AwaySource = { read: () => RowAway; subscribe: (listener: () => void) => () => void };
+
+type ListFrame = { top: number; height: number };
+export type ListFrameSource = { read: () => ListFrame | null; subscribe: (listener: () => void) => () => void; onLayout: (e: LayoutChangeEvent) => void };
+
+export function useListFrame(): ListFrameSource {
+  const [frame] = useState<ListFrameSource>(() => {
+    let value: ListFrame | null = null;
+    const listeners = new Set<() => void>();
+    return {
+      read: () => value,
+      subscribe: (listener) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+      onLayout: (e) => {
+        const { y, height } = e.nativeEvent.layout;
+        if (value && value.top === y && value.height === height) return;
+        value = { top: y, height };
+        for (const listener of listeners) listener();
+      },
+    };
+  });
+  return frame;
+}
+
+export function SelectedRowPillFrame({ frame: source, lift, ...pill }: { frame: ListFrameSource; lift: number } & Parameters<typeof SelectedRowPill>[0]) {
+  const frame = useSyncExternalStore(source.subscribe, source.read, source.read);
+  if (!frame) return null;
+  return (
+    <View pointerEvents="box-none" style={{ position: "absolute", left: 0, right: 0, top: frame.top + GLOW_ROOM - lift, height: Math.max(0, frame.height - GLOW_ROOM + lift), zIndex: 2 }}>
+      <SelectedRowPill {...pill} />
+    </View>
+  );
+}
 
 export function SelectedRowPill({ windowId, away: source, bottomShift }: { windowId: string; away: AwaySource; bottomShift?: Animated.AnimatedInterpolation<number> }) {
   const away = useSyncExternalStore(source.subscribe, source.read, source.read);

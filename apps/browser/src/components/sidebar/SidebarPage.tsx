@@ -8,7 +8,7 @@ import { SidebarTextScope } from "./SidebarTextScope";
 import { ThemeScope } from "../window/ThemeScope";
 import { PageProfileContext, useSettings, useWindowId } from "../../state/browser/hooks";
 import { newTab } from "../../state/tabs/actions";
-import { useSidebarCells } from "../../state/sidebar/hooks";
+import { sidebarListLengthNow, useSidebarCells } from "../../state/sidebar/hooks";
 import { useSidebarField, useSidebarPart } from "../../state/sidebar/chrome";
 import { SIDEBAR_PLAYER_GROWTH, SIDEBAR_PLAYER_HEIGHT, SidebarPlayer, usePlayerMotion, useSidebarPlayerTab } from "../media/SidebarPlayer";
 import { usePageStyle } from "../../state/windows/profilePager";
@@ -24,11 +24,11 @@ import { useAddressBarInSidebar, usePageFrameInset, useToolbarLightsCenter } fro
 import { useToolbarRow } from "../toolbar/useToolbarRow";
 import { startsOffScreen } from "../../state/sidebar/geometry";
 import { toggleNewTabBar } from "../../state/omnibox/newTabBar";
-import { DOCK_SHARE, DOCKED_ROW_PAD, dockedAfter, GLOW_ROOM, pageLayout, tilesFitDock, type SidebarGeometry } from "./pageLayout";
+import { clearlyOverflows, DOCK_SHARE, DOCKED_ROW_PAD, dockedAfter, GLOW_ROOM, pageLayout, tilesFitDock, type SidebarGeometry } from "./pageLayout";
 import { noteNewTabDocked } from "../../state/telemetry/sidebarScrollCounts";
 import { PageRows } from "./PageRows";
 import { NewTabRow } from "./NewTabRow";
-import { SelectedRowPill, useSelectedRowAway } from "./SelectedRowPill";
+import { SelectedRowPillFrame, useListFrame, useSelectedRowAway } from "./SelectedRowPill";
 import { withOverscan, type ListViewport } from "./listViewport";
 
 const NONE: string[] = [];
@@ -82,6 +82,11 @@ export const SidebarPage = memo(function SidebarPage({ profileId, slot, paging, 
     if (!dragging) fixedBeforeDrag.current = fits;
   });
   const [dockedNow, setDockedNow] = useState(false);
+  const [dockGuessed, setDockGuessed] = useState(false);
+  if (!dockGuessed && canDock && height > 0) {
+    setDockGuessed(true);
+    if (clearlyOverflows(sidebarListLengthNow(windowId, profileId), height)) setDockedNow(true);
+  }
   const docked = canDock && dockedNow;
   const { dockFixed, capped } = pageLayout({
     tiles: tiles.length,
@@ -125,7 +130,7 @@ export const SidebarPage = memo(function SidebarPage({ profileId, slot, paging, 
     return () => onScrollView(null);
   }, [current, onScrollView]);
   const selectedRow = useSelectedRowAway(windowId, geometry, scrollView, () => page.scrollY);
-  const [listFrame, setListFrame] = useState<{ top: number; height: number } | null>(null);
+  const listFrame = useListFrame();
   useLayoutEffect(() => {
     if (!geometry) return;
     geometry.current.viewport = page.viewport;
@@ -181,7 +186,7 @@ export const SidebarPage = memo(function SidebarPage({ profileId, slot, paging, 
                 {edgeLift ? <View style={{ height: edgeLift }} /> : null}
               </View>
               <Animated.View
-                onLayout={(e) => setListFrame({ top: e.nativeEvent.layout.y, height: e.nativeEvent.layout.height })}
+                onLayout={listFrame.onLayout}
                 style={{ flex: 1, marginTop: -GLOW_ROOM, overflow: "hidden", transform: [{ translateY: edge }] }}
               >
                 <Animated.View style={{ flex: 1, transform: [{ translateY: unedge }] }}>
@@ -236,11 +241,7 @@ export const SidebarPage = memo(function SidebarPage({ profileId, slot, paging, 
               <Animated.View pointerEvents="none" style={{ height: 0, zIndex: 1, transform: [{ translateY: playerMotion.listClip }] }}>
                 <ScrollEdgeLine opacity={scrollEdgeBelow.opacity} style={{ position: "absolute", left: 0, right: 0, bottom: 0 }} />
               </Animated.View>
-              {geometry && listFrame ? (
-                <View pointerEvents="box-none" style={{ position: "absolute", left: 0, right: 0, top: listFrame.top + GLOW_ROOM - edgeLift, height: Math.max(0, listFrame.height - GLOW_ROOM + edgeLift), zIndex: 2 }}>
-                  <SelectedRowPill windowId={windowId} away={selectedRow.away} bottomShift={playerMotion.listClip} />
-                </View>
-              ) : null}
+              {geometry ? <SelectedRowPillFrame frame={listFrame} lift={edgeLift} windowId={windowId} away={selectedRow.away} bottomShift={playerMotion.listClip} /> : null}
               {playerTab ? (
                 <View style={{ paddingHorizontal: layout.sidebarInset, paddingTop: docked ? space.m : 0, paddingBottom: docked ? 0 : space.m }}>
                   <SidebarPlayer tabId={playerTab} motion={playerMotion} docked={docked} />
