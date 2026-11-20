@@ -82,7 +82,7 @@ export const LiveFolderBlock = memo(function LiveFolderBlock({ folderId, windowI
           pointerEvents="none"
           style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0, borderRadius: GROUP_RADIUS, backgroundColor: fill, borderWidth: GROUP_BORDER, borderColor: stroke, opacity: boxOpacity }}
         />
-        <View ref={headerRef} {...handle} style={{ marginHorizontal: -PAD }}>
+        <View ref={headerRef} {...handle} style={{ marginHorizontal: -(PAD + GROUP_BORDER) }}>
           <FolderHeader folderId={folderId} windowId={windowId} collapsed={collapsed} />
         </View>
         <Fold fold={fold} collapsed={collapsed} entries={entries} keep={keep} padBottom={PAD} />
@@ -154,11 +154,7 @@ function FolderHeader({ folderId, windowId, collapsed }: { folderId: string; win
         >
           {() => (
             <Squish scale={squish.scale}>
-            <SidebarRowSurface
-              fill={ink.clear}
-              cornerRadius={GROUP_INNER_RADIUS}
-              padLeft={TAB_ROW.contentLeft + PAD}
-            >
+            <SidebarRowSurface fill={ink.clear} cornerRadius={GROUP_INNER_RADIUS}>
               <LiveFolderIcon folder={folder} open={!collapsed} />
               <SidebarRowLabel text={folder.name} weight="medium" color={tokens.groupTitle} />
               {status?.error ? (
