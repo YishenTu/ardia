@@ -14,7 +14,7 @@ import { layout, useTheme } from "../ui/theme";
 import { useLiveColors } from "../live/tokens";
 import { TabRow } from "./TabRow";
 import { Fold, useFold, type FoldEntry } from "./Fold";
-import { GROUP_BORDER, GROUP_INNER_RADIUS, GROUP_RADIUS, LIVE_FOLDER_PAD } from "./geometry";
+import { GROUP_BORDER, GROUP_INNER_RADIUS, GROUP_RADIUS, LIVE_FOLDER_BOX_PAD, LIVE_FOLDER_HEADER_MARGIN, LIVE_FOLDER_PAD } from "./geometry";
 import { useDragFolded, useDragItem } from "./DragProvider";
 import { dismissHover } from "../../state/sidebar/hover";
 import { useGroupHover } from "./hoverController";
@@ -35,7 +35,8 @@ import { entryKey } from "../../state/sidebar/entryKey";
 const PAD = LIVE_FOLDER_PAD;
 const EMPTY: LiveItem[] = [];
 const NONE: string[] = [];
-const BOX_ROOM = { paddingVertical: GROUP_BORDER, paddingHorizontal: PAD + GROUP_BORDER } as const;
+const HEADER_ROOM = { marginHorizontal: LIVE_FOLDER_HEADER_MARGIN } as const;
+const BOX_ROOM = { paddingVertical: GROUP_BORDER, paddingHorizontal: LIVE_FOLDER_BOX_PAD } as const;
 const REFRESH_SLOT = { minWidth: iconButton.s.box, alignSelf: "stretch", flexDirection: "row", alignItems: "center", justifyContent: "flex-end" } as const;
 const REFRESH_OVER = { position: "absolute", top: 0, bottom: 0, right: 0, flexDirection: "row", alignItems: "center" } as const;
 
@@ -82,7 +83,7 @@ export const LiveFolderBlock = memo(function LiveFolderBlock({ folderId, windowI
           pointerEvents="none"
           style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0, borderRadius: GROUP_RADIUS, backgroundColor: fill, borderWidth: GROUP_BORDER, borderColor: stroke, opacity: boxOpacity }}
         />
-        <View ref={headerRef} {...handle} style={{ marginHorizontal: -(PAD + GROUP_BORDER) }}>
+        <View ref={headerRef} {...handle} style={HEADER_ROOM}>
           <FolderHeader folderId={folderId} windowId={windowId} collapsed={collapsed} />
         </View>
         <Fold fold={fold} collapsed={collapsed} entries={entries} keep={keep} padBottom={PAD} />
